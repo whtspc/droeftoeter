@@ -1,0 +1,6 @@
+config.toml
+*.exe
+*.exe~
+dist/
+droeftoeter-*.js
+droeftoeter-*.txt

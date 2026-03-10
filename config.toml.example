@@ -1,0 +1,4 @@
+provider = "openai"                          # "openai", "gemini", "anthropic", "ollama"
+api_key  = "gsk_..."                        # API key (not needed for Ollama)
+base_url = "https://api.groq.com/openai/v1" # For openai-compatible and ollama
+model    = "llama-3.3-70b-versatile"
