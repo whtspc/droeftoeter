@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -57,6 +58,12 @@ func Load() *Config {
 			cfg.Model = v
 		}
 	}
+
+	// Strip null bytes that can sneak in from Windows terminal input
+	cfg.Provider = strings.ReplaceAll(cfg.Provider, "\x00", "")
+	cfg.APIKey = strings.ReplaceAll(cfg.APIKey, "\x00", "")
+	cfg.BaseURL = strings.ReplaceAll(cfg.BaseURL, "\x00", "")
+	cfg.Model = strings.ReplaceAll(cfg.Model, "\x00", "")
 
 	// Migrate legacy "groq" provider to generic "openai"
 	if cfg.Provider == "groq" {

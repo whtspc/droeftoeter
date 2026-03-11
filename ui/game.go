@@ -28,9 +28,6 @@ var (
 	dimStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240"))
 
-	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196"))
-
 	headerStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("220")).
 			Bold(true)
@@ -50,14 +47,8 @@ type viewMode int
 const (
 	viewGrid viewMode = iota
 	viewCode
-	viewHistory
 	viewSetup
 )
-
-type codeEntry struct {
-	prompt string
-	code   string
-}
 
 type Model struct {
 	sb       *sandbox.Sandbox
@@ -72,12 +63,10 @@ type Model struct {
 	thinking    bool
 	currentCode string
 	promptHistory []string
-	codeHistory   []codeEntry
 
 	// View
 	view       viewMode
 	scrollOffset int
-	scrollMax    int
 
 	// Size
 	width  int
@@ -265,9 +254,6 @@ func (m *Model) handleInput() {
 		result, err := llm.Generate(llmCfg, systemPrompt, messages)
 
 		m.promptHistory = append(m.promptHistory, input)
-		if err == nil {
-			m.codeHistory = append(m.codeHistory, codeEntry{prompt: input, code: result})
-		}
 
 		// Send result back via the program
 		if programPtr != nil {
@@ -283,7 +269,7 @@ func (m *Model) handleCommand(cmd string) {
 	parts := strings.Fields(cmd)
 	switch parts[0] {
 	case "/help":
-		m.setStatus("/rerun /clear /code /history /config /export-code /export-prompt")
+		m.setStatus("/rerun /clear /code /config /export /import <file>")
 
 	case "/rerun":
 		if m.currentCode == "" {
@@ -298,6 +284,7 @@ func (m *Model) handleCommand(cmd string) {
 	case "/clear":
 		m.sb.Reset()
 		m.currentCode = ""
+		m.promptHistory = nil
 		m.tickNum = 0
 		m.setStatus("[cleared]")
 
@@ -309,23 +296,19 @@ func (m *Model) handleCommand(cmd string) {
 		m.view = viewCode
 		m.scrollOffset = 0
 
-	case "/history":
-		if len(m.codeHistory) == 0 {
-			m.setStatus("[no history yet]")
-			return
-		}
-		m.view = viewHistory
-		m.scrollOffset = 0
-
 	case "/config":
 		m.view = viewSetup
 		m.initSetupFromConfig()
 
-	case "/export-code":
+	case "/export":
 		m.exportCode()
 
-	case "/export-prompt":
-		m.exportPrompt()
+	case "/import":
+		if len(parts) < 2 {
+			m.setStatus("[usage] /import <file.js>")
+			return
+		}
+		m.importCode(parts[1])
 
 	default:
 		m.setStatus("[unknown command: " + parts[0] + "] type /help for commands")
@@ -340,43 +323,25 @@ func (m *Model) exportCode() {
 	ts := time.Now().Format("20060102-150405")
 	filename := fmt.Sprintf("droeftoeter-code-%s.js", ts)
 
-	var sb strings.Builder
-	sb.WriteString("// === Current Running Code ===\n")
-	sb.WriteString(m.currentCode)
-	sb.WriteString("\n\n// === History ===\n")
-	for i, entry := range m.codeHistory {
-		sb.WriteString(fmt.Sprintf("\n// --- #%d Prompt: %s ---\n", i+1, entry.prompt))
-		sb.WriteString(entry.code)
-		sb.WriteString("\n")
-	}
-
-	if err := os.WriteFile(filename, []byte(sb.String()), 0644); err != nil {
+	if err := os.WriteFile(filename, []byte(m.currentCode), 0644); err != nil {
 		m.setStatus("[export error] " + err.Error())
 		return
 	}
 	m.setStatus("[exported] " + filename)
 }
 
-func (m *Model) exportPrompt() {
-	systemPrompt := llm.BuildSystemPrompt(m.currentCode)
-
-	var prompt strings.Builder
-	prompt.WriteString(systemPrompt)
-	if len(m.promptHistory) > 0 {
-		prompt.WriteString("\n\n--- USER PROMPT HISTORY ---\n")
-		for i, p := range m.promptHistory {
-			prompt.WriteString(fmt.Sprintf("%d. %s\n", i+1, p))
-		}
-	}
-
-	ts := time.Now().Format("20060102-150405")
-	filename := fmt.Sprintf("droeftoeter-prompt-%s.txt", ts)
-
-	if err := os.WriteFile(filename, []byte(prompt.String()), 0644); err != nil {
-		m.setStatus("[export error] " + err.Error())
+func (m *Model) importCode(filename string) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		m.setStatus("[import error] " + err.Error())
 		return
 	}
-	m.setStatus("[exported] " + filename)
+	code := string(data)
+	m.sb.Reset()
+	m.sb.Inject(code)
+	m.currentCode = code
+	m.tickNum = 0
+	m.setStatus("[imported] " + filename)
 }
 
 func (m Model) View() string {
@@ -385,8 +350,6 @@ func (m Model) View() string {
 		return m.viewSetupScreen()
 	case viewCode:
 		return m.viewCodeScreen()
-	case viewHistory:
-		return m.viewHistoryScreen()
 	default:
 		return m.viewGridScreen()
 	}
@@ -409,12 +372,13 @@ func (m Model) viewGridScreen() string {
 				if ch == "" {
 					ch = "?"
 				}
+				r := []rune(ch)[0]
 				if cell.Color != "" {
 					row.WriteString(lipgloss.NewStyle().
 						Foreground(lipgloss.Color(cell.Color)).
-						Render(string(ch[0])))
+						Render(string(r)))
 				} else {
-					row.WriteString(string(ch[0]))
+					row.WriteRune(r)
 				}
 			}
 		}
@@ -474,50 +438,10 @@ func (m Model) viewCodeScreen() string {
 	return b.String()
 }
 
-func (m Model) viewHistoryScreen() string {
-	var b strings.Builder
-
-	b.WriteString(headerStyle.Render("=== CODE HISTORY === (Esc to return, PgUp/PgDown to scroll)"))
-	b.WriteString("\n\n")
-
-	var allLines []string
-	for i, entry := range m.codeHistory {
-		allLines = append(allLines, headerStyle.Render(fmt.Sprintf("--- #%d: %s ---", i+1, entry.prompt)))
-		for _, cl := range strings.Split(entry.code, "\n") {
-			allLines = append(allLines, cl)
-		}
-		allLines = append(allLines, "")
-	}
-
-	maxVisible := m.height - 4
-	if maxVisible < 5 {
-		maxVisible = 20
-	}
-
-	maxScroll := len(allLines) - maxVisible
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
-	if m.scrollOffset > maxScroll {
-		m.scrollOffset = maxScroll
-	}
-
-	end := m.scrollOffset + maxVisible
-	if end > len(allLines) {
-		end = len(allLines)
-	}
-
-	for _, line := range allLines[m.scrollOffset:end] {
-		b.WriteString(line)
-		b.WriteString("\n")
-	}
-
-	b.WriteString(fmt.Sprintf("\n%s", dimStyle.Render(fmt.Sprintf("[lines %d-%d of %d]", m.scrollOffset+1, end, len(allLines)))))
-
-	return b.String()
-}
-
 func Run(cfg *config.Config) error {
+	// Request terminal resize: 68 cols (grid + border) x 37 rows (grid + border + status + prompt)
+	fmt.Print("\x1b[8;37;68t")
+
 	m := NewModel(cfg)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	programPtr = p

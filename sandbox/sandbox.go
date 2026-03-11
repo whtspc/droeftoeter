@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
+	"github.com/mattn/go-runewidth"
 )
 
 const (
@@ -77,6 +78,11 @@ func (s *Sandbox) initRuntime() {
 		}
 
 		char := call.Arguments[2].String()
+		// Replace double-width characters (emoji etc.) with a fallback
+		// to prevent grid misalignment.
+		if r := []rune(char); len(r) > 0 && runewidth.RuneWidth(r[0]) > 1 {
+			char = "?"
+		}
 		color := "#ffffff"
 		if len(call.Arguments) >= 4 && call.Arguments[3] != goja.Undefined() && call.Arguments[3] != goja.Null() {
 			color = call.Arguments[3].String()

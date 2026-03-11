@@ -3,11 +3,23 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/whtspc/droeftoeter/config"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+// filterPrintable drops null bytes and non-printable runes from input.
+func filterPrintable(runes []rune) string {
+	var b strings.Builder
+	for _, r := range runes {
+		if r != 0 && unicode.IsPrint(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
 
 type providerPreset struct {
 	label    string
@@ -130,7 +142,10 @@ func (m *Model) handleSetupKey(msg tea.KeyMsg) {
 		return
 
 	case tea.KeyRunes:
-		ch := string(msg.Runes)
+		ch := filterPrintable(msg.Runes)
+		if ch == "" {
+			return
+		}
 		switch m.setupField {
 		case fieldAPIKey:
 			if preset.needsKey {

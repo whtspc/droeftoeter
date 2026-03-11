@@ -317,6 +317,11 @@ CRITICAL — PRESERVING EXISTING CODE:
 - If there is existing code, copy it entirely and add/modify only what the user asks for.
 - Only if the user says "clear", "reset", "start over", or "remove" should you drop existing code.
 
+VISUAL STYLE:
+- You have the full Unicode range available. Mix block elements (█ ▓ ▒ ░ ▄ ▀),
+  box-drawing (─ │ ┌ ┐ └ ┘), symbols (● ◆ ★ ▲ ■), and regular characters creatively.
+- Do NOT use emoji or other double-width characters — they break the grid alignment.
+
 RULES:
 - Respond with ONLY a complete JavaScript program. No explanation, no markdown, no backticks.
 - Use setCell() for all drawing. Do NOT assign to grid[][] directly.
