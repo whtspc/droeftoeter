@@ -162,7 +162,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if len(m.input) > 0 {
-				m.handleInput()
+				return m, m.handleInput()
 			}
 			return m, nil
 
@@ -202,6 +202,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case tea.KeySpace:
+			if m.view == viewGrid {
+				m.input += " "
+			}
+			return m, nil
+
 		case tea.KeyRunes:
 			if m.view == viewGrid {
 				m.input += string(msg.Runes)
@@ -213,14 +219,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleInput() {
+func (m *Model) handleInput() tea.Cmd {
 	input := m.input
 	m.input = ""
 
 	// Slash commands
 	if strings.HasPrefix(input, "/") {
-		m.handleCommand(input)
-		return
+		return m.handleCommand(input)
 	}
 
 	// LLM request
@@ -260,21 +265,25 @@ func (m *Model) handleInput() {
 			programPtr.Send(llmResultMsg{code: result, err: err})
 		}
 	}()
+	return nil
 }
 
 // programPtr is set by Run() so goroutines can send messages back
 var programPtr *tea.Program
 
-func (m *Model) handleCommand(cmd string) {
+func (m *Model) handleCommand(cmd string) tea.Cmd {
 	parts := strings.Fields(cmd)
 	switch parts[0] {
 	case "/help":
-		m.setStatus("/rerun /clear /code /config /export /import <file>")
+		m.setStatus("/rerun /clear /code /config /export /import <file> /quit")
+
+	case "/quit":
+		return tea.Quit
 
 	case "/rerun":
 		if m.currentCode == "" {
 			m.setStatus("[no code to rerun]")
-			return
+			return nil
 		}
 		m.sb.Reset()
 		m.tickNum = 0
@@ -291,7 +300,7 @@ func (m *Model) handleCommand(cmd string) {
 	case "/code":
 		if m.currentCode == "" {
 			m.setStatus("[no code yet]")
-			return
+			return nil
 		}
 		m.view = viewCode
 		m.scrollOffset = 0
@@ -306,13 +315,14 @@ func (m *Model) handleCommand(cmd string) {
 	case "/import":
 		if len(parts) < 2 {
 			m.setStatus("[usage] /import <file.js>")
-			return
+			return nil
 		}
 		m.importCode(parts[1])
 
 	default:
 		m.setStatus("[unknown command: " + parts[0] + "] type /help for commands")
 	}
+	return nil
 }
 
 func (m *Model) exportCode() {
