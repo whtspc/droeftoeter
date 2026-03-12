@@ -196,13 +196,17 @@ func (m *Model) saveSetup() {
 	m.cfg.BaseURL = m.setupBaseURL
 	m.cfg.Model = m.setupModel
 
-	if err := config.Save(m.cfg); err != nil {
+	// Derive profile name from preset label (lowercase, no spaces/parens)
+	name := strings.ToLower(preset.label)
+	name = strings.NewReplacer(" ", "-", "(", "", ")", "").Replace(name)
+
+	if err := config.Save(m.cfg, name); err != nil {
 		m.setStatus("[error] " + err.Error())
 		return
 	}
 
 	m.view = viewGrid
-	m.setStatus(fmt.Sprintf("[config saved] %s / %s", preset.label, m.cfg.Model))
+	m.setStatus(fmt.Sprintf("[config saved] %s / %s", name, m.cfg.Model))
 }
 
 func (m Model) viewSetupScreen() string {

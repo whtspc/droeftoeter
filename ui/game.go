@@ -275,7 +275,7 @@ func (m *Model) handleCommand(cmd string) tea.Cmd {
 	parts := strings.Fields(cmd)
 	switch parts[0] {
 	case "/help":
-		m.setStatus("/rerun /clear /code /config /export /import <file> /quit")
+		m.setStatus("/rerun /clear /code /config /switch /export /import <file> /quit")
 
 	case "/quit":
 		return tea.Quit
@@ -309,12 +309,25 @@ func (m *Model) handleCommand(cmd string) tea.Cmd {
 		m.view = viewSetup
 		m.initSetupFromConfig()
 
+	case "/switch":
+		name, cfg := config.NextProfile(config.ActiveName())
+		if cfg == nil {
+			m.setStatus("[no other profiles — use /config to add one]")
+			return nil
+		}
+		*m.cfg = *cfg
+		m.setStatus(fmt.Sprintf("[switched] %s / %s", name, cfg.Model))
+
 	case "/export":
-		m.exportCode()
+		if len(parts) < 2 {
+			m.setStatus("[usage] /export <name>")
+			return nil
+		}
+		m.exportCode(parts[1])
 
 	case "/import":
 		if len(parts) < 2 {
-			m.setStatus("[usage] /import <file.js>")
+			m.setStatus("[usage] /import <name>")
 			return nil
 		}
 		m.importCode(parts[1])
@@ -325,13 +338,19 @@ func (m *Model) handleCommand(cmd string) tea.Cmd {
 	return nil
 }
 
-func (m *Model) exportCode() {
+func ensureJS(name string) string {
+	if !strings.HasSuffix(name, ".js") {
+		return name + ".js"
+	}
+	return name
+}
+
+func (m *Model) exportCode(name string) {
 	if m.currentCode == "" {
 		m.setStatus("[no code to export]")
 		return
 	}
-	ts := time.Now().Format("20060102-150405")
-	filename := fmt.Sprintf("droeftoeter-code-%s.js", ts)
+	filename := ensureJS(name)
 
 	if err := os.WriteFile(filename, []byte(m.currentCode), 0644); err != nil {
 		m.setStatus("[export error] " + err.Error())
@@ -340,7 +359,8 @@ func (m *Model) exportCode() {
 	m.setStatus("[exported] " + filename)
 }
 
-func (m *Model) importCode(filename string) {
+func (m *Model) importCode(name string) {
+	filename := ensureJS(name)
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		m.setStatus("[import error] " + err.Error())
@@ -404,8 +424,18 @@ func (m Model) viewGridScreen() string {
 		b.WriteString("\n")
 	}
 
-	// Prompt
-	b.WriteString(promptStyle.Render("> ") + m.input + promptStyle.Render("_"))
+	// Prompt (wrap to terminal width)
+	prompt := "> " + m.input + "_"
+	w := m.width
+	if w <= 0 {
+		w = 68
+	}
+	for len(prompt) > w {
+		b.WriteString(promptStyle.Render(prompt[:w]))
+		b.WriteString("\n")
+		prompt = prompt[w:]
+	}
+	b.WriteString(promptStyle.Render(prompt))
 
 	return b.String()
 }

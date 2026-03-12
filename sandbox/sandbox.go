@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/mattn/go-runewidth"
@@ -89,7 +90,10 @@ func (s *Sandbox) initRuntime() {
 		}
 
 		s.grid[x][y] = &Cell{Char: char, Color: color}
-		vm.RunString(fmt.Sprintf(`grid[%d][%d] = {char: "%s", color: "%s"};`, x, y, char, color))
+		// Use JSON-style escaping to prevent JS injection from char/color values
+		escapedChar := strings.ReplaceAll(strings.ReplaceAll(char, `\`, `\\`), `"`, `\"`)
+		escapedColor := strings.ReplaceAll(strings.ReplaceAll(color, `\`, `\\`), `"`, `\"`)
+		vm.RunString(fmt.Sprintf(`grid[%d][%d] = {char: "%s", color: "%s"};`, x, y, escapedChar, escapedColor))
 		return goja.Undefined()
 	})
 
