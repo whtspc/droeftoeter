@@ -8,9 +8,12 @@ You type what you want to see. A 64x32 character grid comes alive. Each prompt b
 
 I would love to see someone livecode VJing with droeftoeter on a beamer during an algorave.
 
+## Demo
+https://youtu.be/-atrhQ-9Vy8
+
 ## Get it
 
-Grab a binary from the [Releases](https://github.com/whtspc/droeftoeter/releases).
+Binaries at [Releases](https://github.com/whtspc/droeftoeter/releases).
 
 Or build from source:
 
