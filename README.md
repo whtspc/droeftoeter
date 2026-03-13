@@ -11,7 +11,8 @@ I would love to see someone livecode VJing with droeftoeter on a beamer during a
 ## Demo
 https://youtu.be/-atrhQ-9Vy8
 
-![Screenshot](underthesea.png)
+![Screenshot1](underthesea.png)
+![Screenshot2](soccergame.png)
 
 ## Get it
 
