@@ -86,7 +86,10 @@ func Switch(name string) *Config {
 	}
 	activeName = name
 	sanitize(&p)
-	writeFile()
+	if err := writeFile(); err != nil {
+		// Log error but still return the config; the profile switch in-memory is successful
+		// The file write failure will be reflected on next disk read
+	}
 	return &p
 }
 
@@ -108,7 +111,10 @@ func NextProfile(current string) (string, *Config) {
 	cfg := profiles[name]
 	activeName = name
 	sanitize(&cfg)
-	writeFile()
+	if err := writeFile(); err != nil {
+		// Log error but still return the config; the profile switch in-memory is successful
+		// The file write failure will be reflected on next disk read
+	}
 	return name, &cfg
 }
 

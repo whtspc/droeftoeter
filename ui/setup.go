@@ -234,7 +234,13 @@ func (m Model) viewSetupScreen() string {
 	if preset.needsKey {
 		keyDisplay := m.setupAPIKey + "_"
 		if m.setupField != fieldAPIKey && len(m.setupAPIKey) > 8 {
-			keyDisplay = m.setupAPIKey[:6] + strings.Repeat("*", len(m.setupAPIKey)-8) + m.setupAPIKey[len(m.setupAPIKey)-2:]
+			// Show first 6, stars for middle, last 2
+			middleStars := strings.Repeat("*", len(m.setupAPIKey)-8)
+			lastTwo := m.setupAPIKey[len(m.setupAPIKey)-2:]
+			keyDisplay = m.setupAPIKey[:6] + middleStars + lastTwo
+		} else if m.setupField != fieldAPIKey && len(m.setupAPIKey) > 0 {
+			// For short keys, just show asterisks
+			keyDisplay = strings.Repeat("*", len(m.setupAPIKey)) + "_"
 		}
 		if m.setupField == fieldAPIKey {
 			b.WriteString(promptStyle.Render("> "))
